@@ -1,0 +1,15 @@
+## PositionLocal
+
+```js
+import {positionLocal} from "three/tsl";
+```
+
+此值本质上来自 `BufferGeometry.attributes.position`。
+
+左下角 `(-0.5, -0.5)`, 右上角 `(0.5, 0.5)`
+
+`positionLocal` 是一个 `vec3`。
+
+转换成颜色时，只能是 `[0, 1]`，所以左上角颜色是 `(0, 0.5, 0)`。
+
+导入内容包括 `Fn`, `toVar`, `If`, `abs`, `rotateUV`, `time`, `vec2`

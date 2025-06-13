@@ -1,8 +1,7 @@
 import "./style.css";
 import * as THREE from "three/webgpu";
-import {color, convertColorSpace, positionLocal, texture} from "three/tsl";
+import {abs, Fn, If, positionLocal, rotateUV, time, vec2} from "three/tsl";
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
-import gridImg from "./grid.png";
 
 const scene = new THREE.Scene();
 
@@ -28,22 +27,34 @@ window.addEventListener("resize", function () {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-const material = new THREE.NodeMaterial(); // comes from three/webgpu
-// material.fragmentNode = color("crimson"); // color comes from three/tsl
-// 调整 color space，让颜色正确显示
-// material.fragmentNode = convertColorSpace(
-//   texture(new THREE.TextureLoader().load(gridImg)),
-//   THREE.SRGBColorSpace,
-//   THREE.LinearSRGBColorSpace
-// );
-material.fragmentNode = positionLocal;
+const main = Fn(() => {
+  const p = positionLocal.toVar();
 
-const mesh = new THREE.Mesh(new THREE.PlaneGeometry(), material);
+  p.assign(rotateUV(p.xy, time, vec2())); // rotate
+
+  If(abs(p.x).greaterThan(0.45), () => {
+    // @ts-ignore
+    p.z = 1;
+  });
+  If(abs(p.y).greaterThan(0.45), () => {
+    // @ts-ignore
+    p.z = 1;
+  });
+  return p;
+});
+
+const material = new THREE.NodeMaterial();
+material.fragmentNode = main();
+
+const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
 scene.add(mesh);
 
 renderer.debug.getShaderAsync(scene, camera, mesh).then((e) => {
+  //console.log(e.vertexShader)
   console.log(e.fragmentShader);
 });
+
+// scene.backgroundNode = main();
 
 function animate() {
   controls.update();
