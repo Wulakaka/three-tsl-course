@@ -1,12 +1,12 @@
 import "./style.css";
 import * as THREE from "three/webgpu";
-import {positionLocal, Fn, If} from "three/tsl";
+import {positionLocal, Fn, If, abs, rotateUV, time, vec2} from "three/tsl";
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(
-  75,
+  53,
   window.innerWidth / window.innerHeight,
   0.1,
   10
@@ -38,7 +38,14 @@ const material = new THREE.NodeMaterial();
 const main = Fn(() => {
   const p = positionLocal.toVar();
 
-  If(p.x.lessThan(0.5), () => {
+  p.assign(rotateUV(p.xy, time, vec2()));
+
+  If(abs(p.x).lessThan(0.01), () => {
+    // @ts-ignore
+    p.z = 1;
+  });
+
+  If(abs(p.y).lessThan(0.01), () => {
     // @ts-ignore
     p.z = 1;
   });
@@ -55,6 +62,8 @@ renderer.debug.getShaderAsync(scene, camera, mesh).then((e) => {
   //console.log(e.vertexShader)
   console.log(e.fragmentShader);
 });
+
+// scene.background = main();
 
 function animate() {
   controls.update();

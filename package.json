@@ -18,5 +18,11 @@
     "typescript": "^5.7.3",
     "vite": "^6.1.0",
     "vite-plugin-top-level-await": "^1.4.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "esbuild"
+    ]
   }
 }
