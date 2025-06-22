@@ -1,19 +1,6 @@
 import "./style.css";
 import * as THREE from "three/webgpu";
-import {
-  abs,
-  atan,
-  cos,
-  Fn,
-  length,
-  positionLocal,
-  rotateUV,
-  sin,
-  step,
-  time,
-  vec2,
-  vec3,
-} from "three/tsl";
+import {positionLocal, Fn, If} from "three/tsl";
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
 const scene = new THREE.Scene();
@@ -40,32 +27,34 @@ window.addEventListener("resize", function () {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
+const material = new THREE.NodeMaterial();
+// material.fragmentNode = color('crimson')
+// material.fragmentNode = convertColorSpace(
+//   texture(new THREE.TextureLoader().load('https://sbcode.net/img/grid.png')),
+//   THREE.SRGBColorSpace,
+//   THREE.LinearSRGBColorSpace
+// )
+
 const main = Fn(() => {
   const p = positionLocal.toVar();
 
-  p.assign(rotateUV(p.xy, time, vec2()));
-
-  p.assign(length(p.mul(5)).sub(atan(p.zy, p.zx)).mul(5));
-  p.sinAssign();
-  p.mulAssign(5);
-
-  p.assign(vec3(p.x.add(sin(time).mul(5)), p.y.add(cos(time).mul(5)), 0));
+  If(p.x.lessThan(0.5), () => {
+    // @ts-ignore
+    p.z = 1;
+  });
 
   return p;
 });
 
-const material = new THREE.NodeMaterial();
 material.fragmentNode = main();
-// material.fragmentNode = positionLocal.length().mul(15).fract().step(0.5);
-// material.fragmentNode = positionLocal.mul(4.9999).fract().step(0.5);
 
-const mesh = new THREE.Mesh(new THREE.BoxGeometry(), material);
+const mesh = new THREE.Mesh(new THREE.PlaneGeometry(), material);
 scene.add(mesh);
 
-// renderer.debug.getShaderAsync(scene, camera, mesh).then((e) => {
-//   //console.log(e.vertexShader)
-//   console.log(e.fragmentShader)
-// })
+renderer.debug.getShaderAsync(scene, camera, mesh).then((e) => {
+  //console.log(e.vertexShader)
+  console.log(e.fragmentShader);
+});
 
 function animate() {
   controls.update();
