@@ -1,12 +1,25 @@
 import "./style.css";
 import * as THREE from "three/webgpu";
-import {positionLocal, Fn, If, abs, rotateUV, time, vec2} from "three/tsl";
+import {
+  abs,
+  atan,
+  cos,
+  Fn,
+  length,
+  positionLocal,
+  rotateUV,
+  sin,
+  step,
+  time,
+  vec2,
+  vec3,
+} from "three/tsl";
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(
-  53,
+  75,
   window.innerWidth / window.innerHeight,
   0.1,
   10
@@ -27,43 +40,31 @@ window.addEventListener("resize", function () {
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-const material = new THREE.NodeMaterial();
-// material.fragmentNode = color('crimson')
-// material.fragmentNode = convertColorSpace(
-//   texture(new THREE.TextureLoader().load('https://sbcode.net/img/grid.png')),
-//   THREE.SRGBColorSpace,
-//   THREE.LinearSRGBColorSpace
-// )
-
 const main = Fn(() => {
   const p = positionLocal.toVar();
 
   p.assign(rotateUV(p.xy, time, vec2()));
 
-  If(abs(p.x).lessThan(0.01), () => {
-    // @ts-ignore
-    p.z = 1;
-  });
+  p.assign(length(p.mul(5)).sub(atan(p.zy, p.zx)).mul(5));
+  p.sinAssign();
+  p.mulAssign(5);
 
-  If(abs(p.y).lessThan(0.01), () => {
-    // @ts-ignore
-    p.z = 1;
-  });
+  p.assign(vec3(p.x.add(sin(time).mul(5)), p.y.add(cos(time).mul(5)), 0));
 
   return p;
 });
 
+const material = new THREE.NodeMaterial();
 material.fragmentNode = main();
+// material.fragmentNode = positionLocal;
 
-const mesh = new THREE.Mesh(new THREE.PlaneGeometry(), material);
+const mesh = new THREE.Mesh(new THREE.BoxGeometry(), material);
 scene.add(mesh);
 
-renderer.debug.getShaderAsync(scene, camera, mesh).then((e) => {
-  //console.log(e.vertexShader)
-  console.log(e.fragmentShader);
-});
-
-// scene.background = main();
+// renderer.debug.getShaderAsync(scene, camera, mesh).then((e) => {
+//   //console.log(e.vertexShader)
+//   console.log(e.fragmentShader)
+// })
 
 function animate() {
   controls.update();
