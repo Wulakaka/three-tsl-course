@@ -1,5 +1,6 @@
 import "./style.css";
 import * as THREE from "three";
+import img from "./frame.png";
 
 function main() {
   // const canvas = document.querySelector("#c");
@@ -18,6 +19,9 @@ function main() {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("white");
+
+  const pickingScene = new THREE.Scene();
+  pickingScene.background = new THREE.Color(0);
 
   // put the camera on a pole (parent it to an object)
   // so we can spin the pole to move the camera around the scene
@@ -51,18 +55,48 @@ function main() {
     return `hsl(${rand(360) | 0}, ${rand(50, 100) | 0}%, 50%)`;
   }
 
+  const loader = new THREE.TextureLoader();
+  const texture = loader.load(img);
+
+  const idToObject: {
+    [id: number]: THREE.Mesh<THREE.BoxGeometry, THREE.MeshPhongMaterial>;
+  } = {};
   const numObjects = 100;
+
   for (let i = 0; i < numObjects; ++i) {
+    const id = i + 1;
     const material = new THREE.MeshPhongMaterial({
       color: randomColor(),
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+      alphaTest: 0.1,
     });
 
     const cube = new THREE.Mesh(geometry, material);
     scene.add(cube);
+    idToObject[id] = cube;
 
     cube.position.set(rand(-20, 20), rand(-20, 20), rand(-20, 20));
     cube.rotation.set(rand(Math.PI), rand(Math.PI), 0);
     cube.scale.set(rand(3, 6), rand(3, 6), rand(3, 6));
+
+    const pickingMaterial = new THREE.MeshPhongMaterial({
+      emissive: new THREE.Color().setHex(id, THREE.NoColorSpace),
+      color: new THREE.Color(0),
+      specular: new THREE.Color(0),
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+      alphaTest: 0.5,
+      blending: THREE.NoBlending,
+    });
+
+    const pickingCube = new THREE.Mesh(geometry, pickingMaterial);
+    pickingScene.add(pickingCube);
+    pickingCube.position.copy(cube.position);
+    pickingCube.rotation.copy(cube.rotation);
+    pickingCube.scale.copy(cube.scale);
   }
 
   window.addEventListener("resize", () => {
@@ -115,15 +149,86 @@ function main() {
       }
     }
   }
+  class GPUPickHelper {
+    pickingTexture: THREE.WebGLRenderTarget;
+    pixelBuffer: Uint8Array;
+    pickedObject: THREE.Mesh<THREE.BoxGeometry, THREE.MeshPhongMaterial> | null;
+    pickedObjectSavedColor: number;
+    constructor() {
+      // 创建一个1x1的渲染目标
+      this.pickingTexture = new THREE.WebGLRenderTarget(1, 1);
+      this.pixelBuffer = new Uint8Array(4);
+      this.pickedObject = null;
+      this.pickedObjectSavedColor = 0;
+    }
+    pick(
+      cssPosition: THREE.Vector2,
+      scene: THREE.Scene,
+      camera: THREE.PerspectiveCamera,
+      time: number
+    ) {
+      const {pickingTexture, pixelBuffer} = this;
+      // restore the color if there is a picked object
+      if (this.pickedObject) {
+        this.pickedObject.material.emissive.setHex(this.pickedObjectSavedColor);
+        this.pickedObject = null;
+      }
+
+      // 设置事业偏移来表现鼠标下的1px
+      const pixelRatio = renderer.getPixelRatio();
+      camera.setViewOffset(
+        renderer.getContext().drawingBufferWidth, // 全宽
+        renderer.getContext().drawingBufferHeight, // 全高
+        (cssPosition.x * pixelRatio) | 0, // rect x
+        (cssPosition.y * pixelRatio) | 0, // rect y
+        1, // 宽度
+        1 // 高度
+      );
+
+      // 渲染场景
+      renderer.setRenderTarget(pickingTexture);
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(null);
+
+      // 清理场景偏移，回归正常
+      camera.clearViewOffset();
+
+      // 读取像素
+      renderer.readRenderTargetPixels(
+        pickingTexture,
+        0, // x
+        0, // y
+        1, // width
+        1, // height
+        pixelBuffer // buffer
+      );
+
+      const id =
+        (pixelBuffer[0] << 16) | (pixelBuffer[1] << 8) | pixelBuffer[2];
+
+      const intersectedObject = idToObject[id];
+      if (intersectedObject) {
+        // 获取第一个对象，他是离鼠标最近的一个
+        this.pickedObject = intersectedObject;
+        // 保存它的颜色
+        this.pickedObjectSavedColor =
+          this.pickedObject.material.emissive.getHex();
+        // 设置它的发光颜色为红色或黄色
+        this.pickedObject.material.emissive.setHex(
+          (time * 8) % 2 > 1 ? 0xffff00 : 0xff0000
+        );
+      }
+    }
+  }
 
   const pickPosition = new THREE.Vector2();
-  const pickHelper = new PickHelper();
+  const pickHelper = new GPUPickHelper();
   clearPickPosition();
 
   function animate(time: number) {
     time *= 0.001;
     cameraPole.rotation.y = time * 0.1;
-    pickHelper.pick(pickPosition, scene, camera, time);
+    pickHelper.pick(pickPosition, pickingScene, camera, time);
 
     // just render the scene
     renderer.render(scene, camera);
@@ -141,8 +246,10 @@ function main() {
   function setPickPosition(event: MouseEvent | Touch) {
     const canvas = renderer.domElement;
     const pos = getCanvasRelativePosition(event);
-    pickPosition.x = (pos.x / canvas.width) * 2 - 1;
-    pickPosition.y = (pos.y / canvas.height) * -2 + 1; // note we flip Y
+    // pickPosition.x = (pos.x / canvas.width) * 2 - 1;
+    // pickPosition.y = (pos.y / canvas.height) * -2 + 1; // note we flip Y
+    pickPosition.x = pos.x;
+    pickPosition.y = pos.y;
   }
 
   function clearPickPosition() {
