@@ -1,6 +1,9 @@
 import "./style.css";
 import * as THREE from "three";
 import img from "./frame.png";
+import {EffectComposer} from "three/examples/jsm/postprocessing/EffectComposer.js";
+import {RenderPass} from "three/examples/jsm/postprocessing/RenderPass.js";
+import {OutlinePass} from "three/examples/jsm/postprocessing/OutlinePass.js";
 
 function main() {
   // const canvas = document.querySelector("#c");
@@ -99,10 +102,28 @@ function main() {
     pickingCube.scale.copy(cube.scale);
   }
 
+  const composer = new EffectComposer(renderer);
+  const renderPass = new RenderPass(scene, camera);
+  composer.addPass(renderPass);
+
+  const outlinePass = new OutlinePass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    scene,
+    camera
+  );
+  outlinePass.edgeStrength = 5;
+  outlinePass.edgeGlow = 0;
+  outlinePass.edgeThickness = 2.0;
+  outlinePass.visibleEdgeColor.set("#ffffff");
+  outlinePass.hiddenEdgeColor.set("#ffffff");
+  outlinePass.pulsePeriod = 3;
+  composer.addPass(outlinePass);
+
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    outlinePass.setSize(window.innerWidth, window.innerHeight);
   });
 
   class PickHelper {
@@ -207,6 +228,7 @@ function main() {
         (pixelBuffer[0] << 16) | (pixelBuffer[1] << 8) | pixelBuffer[2];
 
       const intersectedObject = idToObject[id];
+      outlinePass.selectedObjects = [];
       if (intersectedObject) {
         // 获取第一个对象，他是离鼠标最近的一个
         this.pickedObject = intersectedObject;
@@ -214,9 +236,10 @@ function main() {
         this.pickedObjectSavedColor =
           this.pickedObject.material.emissive.getHex();
         // 设置它的发光颜色为红色或黄色
-        this.pickedObject.material.emissive.setHex(
-          (time * 8) % 2 > 1 ? 0xffff00 : 0xff0000
-        );
+        // this.pickedObject.material.emissive.setHex(
+        //   (time * 8) % 2 > 1 ? 0xffff00 : 0xff0000
+        // );
+        outlinePass.selectedObjects = [intersectedObject];
       }
     }
   }
@@ -227,11 +250,12 @@ function main() {
 
   function animate(time: number) {
     time *= 0.001;
-    cameraPole.rotation.y = time * 0.1;
+    // cameraPole.rotation.y = time * 0.1;
     pickHelper.pick(pickPosition, pickingScene, camera, time);
 
     // just render the scene
-    renderer.render(scene, camera);
+    // renderer.render(scene, camera);
+    composer.render();
   }
 
   function getCanvasRelativePosition(event: MouseEvent | Touch) {
